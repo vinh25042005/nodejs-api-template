@@ -94,27 +94,10 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # ── Trivy scan IMAGE đã push lên GHCR (package PUBLIC) ────
+      # ── Trivy scan IMAGE (table — chi tiết + tổng HIGH/CRITICAL) ──
       # GHCR public → trivy pull image trực tiếp, không cần auth.
-      # Dùng digest (bất biến) thay vì tag để quét đúng image vừa build.
-      - name: Trivy scan image (SARIF)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
-          severity: CRITICAL,HIGH
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: 0
-
-      - name: Upload Trivy SARIF
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-results
-          path: trivy-results.sarif
-
-      # Table in ra log cho dễ nhìn (không cần tải artifact)
+      # Table in ra log: chi tiết từng CVE + dòng "Total: N (HIGH: X, CRITICAL: Y)"
+      # cho từng section (OS, npm) → đủ để đọc, không cần scan thêm json/sarif.
       - name: Trivy scan image (table)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -123,27 +106,6 @@ jobs:
           severity: CRITICAL,HIGH
           format: table
           exit-code: 0
-
-      # ── Trivy summary — tổng số vuln HIGH/CRITICAL ────────────
-      - name: Trivy scan image (json)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
-          severity: CRITICAL,HIGH
-          format: json
-          output: trivy-results.json
-          exit-code: 0
-
-      - name: Trivy summary
-        if: always()
-        run: |
-          jq -r '
-            [.Results[].Vulnerabilities[]?.Severity] as $s |
-            "=== TRIVY SUMMARY ===",
-            "TOTAL HIGH/CRITICAL: \($s | length)",
-            ($s | group_by(.) | .[] | "  \(.[0]): \(length)")
-          ' trivy-results.json
 
       # ── SBOM (syft) ────────────────────────────────────────────
       - name: Generate SBOM
