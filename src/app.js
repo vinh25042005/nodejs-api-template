@@ -2,7 +2,7 @@ const express = require('express');
 
 /**
  * Tách app khỏi phần listen để dễ unit test (node --test).
- */nodejs-api-template
+ */
 function createApp() {
   const app = express();
   app.use(express.json());
