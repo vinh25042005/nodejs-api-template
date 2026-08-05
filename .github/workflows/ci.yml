@@ -5,9 +5,10 @@
 #   - tag v*          → build image :<tag> + push GHCR + scan + sign
 #   - pull request    → chỉ chạy test (không build)
 #
-# Secrets (OPTIONAL — bước chưa có secret sẽ tự skip, không fail CI):
-#   COSIGN_PRIVATE_KEY / COSIGN_PASSWORD → ký image (cosign sign + attach SBOM)
-#   SONAR_TOKEN / SONAR_HOST_URL         → job SonarQube scan
+# Secrets:
+#   COSIGN_PRIVATE_KEY / COSIGN_PASSWORD → BẮT BUỘC cho bước ký (thiếu → CI FAIL,
+#     fail-securely, không skip). Đã set cho template repo.
+#   SONAR_TOKEN / SONAR_HOST_URL         → SonarQube (TẠM THỜI SKIP, if: false).
 # Build/push/Trivy/SBOM không cần secret (GHCR dùng GITHUB_TOKEN).
 name: ci
 
@@ -105,7 +106,7 @@ jobs:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
           format: table
-          exit-code: 0
+          exit-code: 1   # có HIGH/CRITICAL → FAIL build (không bỏ lọt lỗi)
 
       # ── SBOM (syft) ────────────────────────────────────────────
       - name: Generate SBOM
@@ -122,13 +123,11 @@ jobs:
           name: sbom
           path: sbom.spdx.json
 
-      # ── Cosign sign + attach SBOM (chạy khi có COSIGN_PRIVATE_KEY) ──
+      # ── Cosign sign + attach SBOM (BẮT BUỘC — không skip) ──
       # GH Actions giữ nguyên newline của secret → dùng env:// an toàn
       # (khác Jenkins phải rebuild PEM bằng tay).
       - uses: sigstore/cosign-installer@v3
-        if: env.COSIGN_PRIVATE_KEY != ''
       - name: Sign + attach SBOM (cosign)
-        if: env.COSIGN_PRIVATE_KEY != ''
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -138,20 +137,19 @@ jobs:
           cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
 
-  # ── SonarQube scan (chạy khi có SONAR_TOKEN + SONAR_HOST_URL) ──
-  # env KHÔNG dùng được trong job-level if → gating ở STEP level
-  # (step-level if có cả env + secrets).
+  # ── SonarQube scan — TẠM THỜI SKIP (if: false) ──────────────
+  # Bật lại: đổi `if: false` → `if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''`
+  # và thêm 2 secrets SONAR_TOKEN + SONAR_HOST_URL.
   sonar:
     needs: test
+    if: false
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
       - uses: actions/checkout@v4
-        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
       - uses: sonarsource/sonarqube-scan-action@v5
-        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         with:
           args: >
             -Dsonar.projectKey=${{ github.event.repository.name }}
