@@ -94,14 +94,14 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # ── Trivy scan (SARIF — cho automation/artifact) ─────────
-      # Quét source tree (fs) — KHÔNG quét image để tránh pull GHCR private.
-      # exit-code: 0 → có lỗ hổng vẫn không fail build (như Jenkins).
-      - name: Trivy scan (fs → SARIF)
+      # ── Trivy scan IMAGE đã push lên GHCR (package PUBLIC) ────
+      # GHCR public → trivy pull image trực tiếp, không cần auth.
+      # Dùng digest (bất biến) thay vì tag để quét đúng image vừa build.
+      - name: Trivy scan image (SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          scan-type: fs
-          scan-ref: .
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
           format: sarif
           output: trivy-results.sarif
@@ -114,15 +114,12 @@ jobs:
           name: trivy-results
           path: trivy-results.sarif
 
-      # ── Trivy scan (table — đọc trực tiếp trong log) ──────────
-      # Trivy trong container không hỗ trợ format html/template
-      # (chỉ có table/json/sarif/...). Table in ra log cho dễ nhìn,
-      # không cần tải artifact.
-      - name: Trivy scan (fs → table)
+      # Table in ra log cho dễ nhìn (không cần tải artifact)
+      - name: Trivy scan image (table)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          scan-type: fs
-          scan-ref: .
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           severity: CRITICAL,HIGH
           format: table
           exit-code: 0
