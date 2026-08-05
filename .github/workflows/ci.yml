@@ -57,6 +57,10 @@ jobs:
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    # secrets KHÔNG dùng được trong if → load qua job-level env, check bằng env context
+    env:
+      COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+      COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
@@ -129,9 +133,9 @@ jobs:
       # GH Actions giữ nguyên newline của secret → dùng env:// an toàn
       # (khác Jenkins phải rebuild PEM bằng tay).
       - uses: sigstore/cosign-installer@v3
-        if: ${{ secrets.COSIGN_PRIVATE_KEY != '' }}
+        if: env.COSIGN_PRIVATE_KEY != ''
       - name: Sign + attach SBOM (cosign)
-        if: ${{ secrets.COSIGN_PRIVATE_KEY != '' }}
+        if: env.COSIGN_PRIVATE_KEY != ''
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
@@ -144,7 +148,8 @@ jobs:
   # ── SonarQube scan (chạy khi có SONAR_TOKEN + SONAR_HOST_URL) ──
   sonar:
     needs: test
-    if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_HOST_URL != '' }}
+    # secrets KHÔNG dùng được trong job-level if → check qua env (đã load ở dưới)
+    if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
