@@ -124,6 +124,27 @@ jobs:
           format: table
           exit-code: 0
 
+      # ── Trivy summary — tổng số vuln HIGH/CRITICAL ────────────
+      - name: Trivy scan image (json)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL,HIGH
+          format: json
+          output: trivy-results.json
+          exit-code: 0
+
+      - name: Trivy summary
+        if: always()
+        run: |
+          jq -r '
+            [.Results[].Vulnerabilities[]?.Severity] as $s |
+            "=== TRIVY SUMMARY ===",
+            "TOTAL HIGH/CRITICAL: \($s | length)",
+            ($s | group_by(.) | .[] | "  \(.[0]): \(length)")
+          ' trivy-results.json
+
       # ── SBOM (syft) ────────────────────────────────────────────
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
