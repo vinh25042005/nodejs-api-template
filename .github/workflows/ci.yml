@@ -146,17 +146,19 @@ jobs:
             "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
 
   # ── SonarQube scan (chạy khi có SONAR_TOKEN + SONAR_HOST_URL) ──
+  # env KHÔNG dùng được trong job-level if → gating ở STEP level
+  # (step-level if có cả env + secrets).
   sonar:
     needs: test
-    # secrets KHÔNG dùng được trong job-level if → check qua env (đã load ở dưới)
-    if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
     steps:
       - uses: actions/checkout@v4
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
       - uses: sonarsource/sonarqube-scan-action@v5
+        if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''
         with:
           args: >
             -Dsonar.projectKey=${{ github.event.repository.name }}
