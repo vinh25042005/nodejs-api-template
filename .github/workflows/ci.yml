@@ -115,15 +115,16 @@ jobs:
           path: trivy-results.sarif
 
       # ── Trivy scan (HTML report — dễ đọc trên browser) ────────
-      # Dùng template html.tpl mặc định (setup-trivy cài vào contrib/).
+      # Trivy ≥0.50 có format html NATIVE (không cần file template).
+      # (Không dùng template path vì trivy-action chạy trivy trong container,
+      #  path host $HOME/... không tồn tại bên trong container.)
       - name: Trivy scan (fs → HTML)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
           severity: CRITICAL,HIGH
-          format: template
-          template: "@$HOME/.local/bin/trivy-bin/contrib/html.tpl"
+          format: html
           output: trivy-report.html
           exit-code: 0
 
