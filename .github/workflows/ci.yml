@@ -114,26 +114,18 @@ jobs:
           name: trivy-results
           path: trivy-results.sarif
 
-      # ── Trivy scan (HTML report — dễ đọc trên browser) ────────
-      # Trivy ≥0.50 có format html NATIVE (không cần file template).
-      # (Không dùng template path vì trivy-action chạy trivy trong container,
-      #  path host $HOME/... không tồn tại bên trong container.)
-      - name: Trivy scan (fs → HTML)
+      # ── Trivy scan (table — đọc trực tiếp trong log) ──────────
+      # Trivy trong container không hỗ trợ format html/template
+      # (chỉ có table/json/sarif/...). Table in ra log cho dễ nhìn,
+      # không cần tải artifact.
+      - name: Trivy scan (fs → table)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
           severity: CRITICAL,HIGH
-          format: html
-          output: trivy-report.html
+          format: table
           exit-code: 0
-
-      - name: Upload Trivy HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: trivy-html-report
-          path: trivy-report.html
 
       # ── SBOM (syft) ────────────────────────────────────────────
       - name: Generate SBOM
