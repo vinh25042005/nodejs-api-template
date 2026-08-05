@@ -116,6 +116,18 @@ jobs:
           format: spdx-json
           output: sbom.spdx.json
 
+      # anchore/sbom-action tạo file theo tên artifact (ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT)
+      # → chuẩn hóa về tên cố định sbom.spdx.json để dùng sau.
+      - name: Normalize SBOM filename
+        run: |
+          ls -1 *.spdx.json
+          if [ -n "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" ] && \
+             [ -f "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" ] && \
+             [ "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" != "sbom.spdx.json" ]; then
+            mv "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" sbom.spdx.json
+          fi
+          test -f sbom.spdx.json && echo "SBOM OK: sbom.spdx.json"
+
       - name: Upload SBOM
         if: always()
         uses: actions/upload-artifact@v4
@@ -123,19 +135,20 @@ jobs:
           name: sbom
           path: sbom.spdx.json
 
-      # ── Cosign sign + attach SBOM (BẮT BUỘC — không skip) ──
-      # GH Actions giữ nguyên newline của secret → dùng env:// an toàn
-      # (khác Jenkins phải rebuild PEM bằng tay).
+      # ── Cosign: sign image + attest SBOM (BẮT BUỘC — không skip) ──
+      # GH Actions giữ nguyên newline của secret → dùng env:// an toàn.
+      # Dùng cosign attest (SBOM ĐƯỢC ký) thay vì cosign attach sbom
+      # (attach đã deprecated + không ký SBOM).
       - uses: sigstore/cosign-installer@v3
-      - name: Sign + attach SBOM (cosign)
+      - name: Sign image + attest SBOM (cosign)
         env:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
-          cosign attach sbom --sbom sbom.spdx.json \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
-          cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
-            "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+          IMG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$IMG"
+          cosign attest --yes --key env://COSIGN_PRIVATE_KEY \
+            --type spdx --predicate sbom.spdx.json "$IMG"
 
   # ── SonarQube scan — TẠM THỜI SKIP (if: false) ──────────────
   # Bật lại: đổi `if: false` → `if: env.SONAR_TOKEN != '' && env.SONAR_HOST_URL != ''`
