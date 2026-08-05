@@ -94,10 +94,10 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      # ── Trivy scan ─────────────────────────────────────────────
+      # ── Trivy scan (SARIF — cho automation/artifact) ─────────
       # Quét source tree (fs) — KHÔNG quét image để tránh pull GHCR private.
       # exit-code: 0 → có lỗ hổng vẫn không fail build (như Jenkins).
-      - name: Trivy scan (fs)
+      - name: Trivy scan (fs → SARIF)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
@@ -113,6 +113,26 @@ jobs:
         with:
           name: trivy-results
           path: trivy-results.sarif
+
+      # ── Trivy scan (HTML report — dễ đọc trên browser) ────────
+      # Dùng template html.tpl mặc định (setup-trivy cài vào contrib/).
+      - name: Trivy scan (fs → HTML)
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          format: template
+          template: "@$HOME/.local/bin/trivy-bin/contrib/html.tpl"
+          output: trivy-report.html
+          exit-code: 0
+
+      - name: Upload Trivy HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-html-report
+          path: trivy-report.html
 
       # ── SBOM (syft) ────────────────────────────────────────────
       - name: Generate SBOM
