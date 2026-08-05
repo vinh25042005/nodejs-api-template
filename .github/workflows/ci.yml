@@ -108,25 +108,15 @@ jobs:
           format: table
           exit-code: 1   # có HIGH/CRITICAL → FAIL build (không bỏ lọt lỗi)
 
-      # ── SBOM (syft) ────────────────────────────────────────────
+      # ── SBOM (syft) — quét ĐÚNG image vừa build ───────────────
+      # Input đúng là `output-file` (không phải `output`) → ghi file sbom.spdx.json
+      # vào workspace. Quét image (thay vì path) để SBOM khớp image được sign/attest.
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          path: .
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: spdx-json
-          output: sbom.spdx.json
-
-      # anchore/sbom-action tạo file theo tên artifact (ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT)
-      # → chuẩn hóa về tên cố định sbom.spdx.json để dùng sau.
-      - name: Normalize SBOM filename
-        run: |
-          ls -1 *.spdx.json
-          if [ -n "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" ] && \
-             [ -f "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" ] && \
-             [ "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" != "sbom.spdx.json" ]; then
-            mv "$ANCHORE_SBOM_ACTION_PRIOR_ARTIFACT" sbom.spdx.json
-          fi
-          test -f sbom.spdx.json && echo "SBOM OK: sbom.spdx.json"
+          output-file: sbom.spdx.json
 
       - name: Upload SBOM
         if: always()
