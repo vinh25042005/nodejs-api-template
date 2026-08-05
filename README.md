@@ -30,21 +30,23 @@ mà không cần nghĩ về CI/CD, Helm, signing, rollout.
 > ⚠️ Giữ cờ `# IMAGE_TAG_ANCHOR` trên dòng `tag:` trong `values.yaml` —
 > script `update-image.sh` dựa vào cờ này để cập nhật tag.
 
-## Secrets cần tạo trong repo GitHub
+## Secrets (optional) trong repo GitHub
 
-**Không cần secret nào.** CI push image lên GHCR (`ghcr.io/<owner>/<repo>`)
-bằng `GITHUB_TOKEN` sẵn có (quyền `packages: write`).
+- **Build/push/Trivy/SBOM:** không cần secret (GHCR dùng `GITHUB_TOKEN`).
+- `COSIGN_PRIVATE_KEY` + `COSIGN_PASSWORD` → ký image (cosign sign + attach SBOM). Chưa set thì CI bỏ qua bước này, không fail.
+- `SONAR_TOKEN` + `SONAR_HOST_URL` → job SonarQube scan. Chưa set thì job bị skip.
 
-> Bước sau (khi nối ArgoCD): sẽ cần `COSIGN_PRIVATE_KEY`/`COSIGN_PASSWORD`
-> (ký image), `GITOPS_REPO`/`GITOPS_DEPLOY_KEY` (commit tag vào gitops repo).
+> Bước sau (nối ArgoCD): thêm `GITOPS_REPO`/`GITOPS_DEPLOY_KEY` để commit tag vào gitops repo.
 
-## Luồng CI/CD (scope hiện tại)
+## Luồng CI/CD
 
 ```
-merge main → test → build :<sha> → push GHCR
-tag v*     → test → build :<tag> → push GHCR
+merge main → test → build :<sha> → push GHCR → Trivy → SBOM → cosign sign
+tag v*     → test → build :<tag> → push GHCR → Trivy → SBOM → cosign sign
+PR         → chỉ chạy test
 ```
 
+SonarQube scan chạy job riêng (`sonar`) khi có secret `SONAR_TOKEN`.
 Image: `ghcr.io/<owner>/<repo>:{sha|tag}`.
 
 ## Chạy cục bộ
